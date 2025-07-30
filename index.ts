@@ -1,45 +1,104 @@
-import qrcode from 'qrcode-terminal';
-import { Client, LocalAuth } from 'whatsapp-web.js';
-import { ERROR_REPLY, FIRST_TRIGGER_MESSAGE, FIRST_TRIGGER_REPLY, KV } from './constants';
+import * as readline from 'readline';
+import { tryCatch } from './try-catch';
+import { WhatsAppBot } from './whatsapp-bot';
 
-const client = new Client({
-  authStrategy: new LocalAuth()
-});
+// Initialize bot
+const bot = new WhatsAppBot();
 
-client.on('ready', () => {
-  console.log('Client is ready!');
-  client.info.pushname = 'Kelurahan Kanigoro Bot';
-});
+// Enhanced graceful shutdown
+const gracefulShutdown = async (signal: string) => {
+  console.log(`\n🛑 Menerima sinyal ${signal}, mematikan dengan aman...`);
+  console.log('📱 Menutup koneksi WhatsApp...');
+  await bot.destroy();
+  console.log('👋 Sampai jumpa!');
+  process.exit(0);
+};
 
-client.on('qr', qr => {
-  qrcode.generate(qr, { small: true });
-});
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 
-client.on('call', call => {
-  call.reject();
-})
-
-client.on('message', message => {
-  const { id: { id }, from } = message
-  console.log(`[${id}][${from}] Received message: ${message.body} `);
-  if (message.body === FIRST_TRIGGER_MESSAGE) {
-    console.log(`[${id}][${from}] Responding with first trigger reply.`);
-    message.reply(FIRST_TRIGGER_REPLY);
-    return;
-  }
-
-  const reply = KV[message.body];
-  if (reply) {
-    console.log(`[${id}][${from}] Responding with reply: ${reply}`);
-    message.reply(reply);
-    return;
-  }
-
-  if (!reply) {
-    console.log(`[${id}][${from}] Responding with error reply.`);
-    message.reply(ERROR_REPLY);
-    return;
+// Handle unhandled errors
+process.on('unhandledRejection', async (reason) => {
+  console.error('❌ Penolakan Tidak Tertangani:', reason);
+  console.log('🔄 Mencoba memulai ulang bot...')
+  const { error } = await tryCatch(bot.clearSessionAndRestart());
+  if (error) {
+    console.error('❌ Gagal memulai ulang. Keluar...');
+    process.exit(1);
   }
 });
 
-client.initialize();
+process.on('uncaughtException', async (error) => {
+  console.error('❌ Kesalahan Tidak Terduga:', error);
+  console.log('🔄 Mencoba memulai ulang bot...');
+  const { error: clearSessionAndRestartError } = await tryCatch(bot.clearSessionAndRestart());
+  if (clearSessionAndRestartError) {
+    console.error('❌ Gagal memulai ulang. Keluar...');
+    process.exit(1);
+  }
+});
+
+// Add console commands for session management
+const setupConsoleCommands = () => {
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+  });
+
+  console.log('\n💻 Perintah Konsol Tersedia:');
+  console.log('   • "restart" - Mulai ulang bot dengan sesi baru');
+  console.log('   • "status" - Tampilkan status sesi');
+  console.log('   • "clear" - Hapus sesi dan mulai ulang');
+  console.log('   • "quit" - Matikan bot');
+  console.log('   • Ketik perintah dan tekan Enter\n');
+
+  rl.on('line', async (input) => {
+    const command = input.trim().toLowerCase();
+
+    switch (command) {
+      case 'restart':
+        console.log('🔄 Memulai ulang bot...');
+        await bot.restart();
+        break;
+
+      case 'status':
+        const status = bot.getSessionStatus();
+        console.log('📊 Status Sesi:');
+        console.log(`   • Memiliki sesi tersimpan: ${status.hasSession ? '✅' : '❌'}`);
+        console.log(`   • Bot siap: ${status.isReady ? '✅' : '❌'}`);
+        break;
+
+      case 'clear':
+        console.log('🗑️ Menghapus sesi...');
+        await bot.clearSessionAndRestart();
+        break;
+
+      case 'quit':
+      case 'exit':
+        await gracefulShutdown('USER_COMMAND');
+        break;
+
+      default:
+        if (command) {
+          console.log('❓ Perintah tidak dikenal. Tersedia: "restart", "status", "clear", "quit"');
+        }
+        break;
+    }
+  });
+};
+
+// Display startup banner
+console.log('🤖 ============================================');
+console.log('📱 Kelurahan Kanigoro WhatsApp Bot');
+console.log('===============================================\n');
+
+// Start the bot
+(async () => {
+  const { error } = await tryCatch(bot.initialize());
+  if (error) {
+    console.error('❌ Gagal memulai bot:', error);
+    process.exit(1);
+  }
+
+  setupConsoleCommands();
+})();
