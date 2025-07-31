@@ -22,21 +22,21 @@ jobs:
       - name: Start compiling executable
         run: bun build --minify --compile --sourcemap --bytecode --target=bun-windows-x64 ./index.ts --outfile "BotWAKanigoro.exe"
 
-      - name: Sign executable
-        uses: skymatic/code-sign-action@v1
-        with:
-          certificate: '${{ secrets.CERT_DATA }}'
-          password: '${{ secrets.CERT_PASSWORD }}'
-          certificatesha1: '${{ secrets.CERT_SHA }}'
-          description: 'Bot Whatsapp Kanigoro'
-          timestampUrl: 'http://timestamp.digicert.com'
-          folder: '.'
-          recursive: false
+      # - name: Sign executable
+      #   uses: skymatic/code-sign-action@v1
+      #   with:
+      #     certificate: '${{ secrets.CERT_DATA }}'
+      #     password: '${{ secrets.CERT_PASSWORD }}'
+      #     certificatesha1: '${{ secrets.CERT_SHA }}'
+      #     description: 'Bot Whatsapp Kanigoro'
+      #     timestampUrl: 'http://timestamp.digicert.com'
+      #     folder: '.'
+      #     recursive: false
           
-      - name: Release executable
-        uses: softprops/action-gh-release@v2.3.2
-        with:
-          name: Bot Whatsapp Kanigoro
-          files: "BotWAKanigoro.exe"
-          tag_name: latest
-          make_latest: true
+      # - name: Release executable
+      #   uses: softprops/action-gh-release@v2.3.2
+      #   with:
+      #     name: Bot Whatsapp Kanigoro
+      #     files: "BotWAKanigoro.exe"
+      #     tag_name: latest
+      #     make_latest: true
